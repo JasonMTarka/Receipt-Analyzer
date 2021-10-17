@@ -34,20 +34,22 @@ def get_text(path: str):
 
     return response.text_annotations
 
-def get_total(text: RepeatedComposite):
+def get_value(text: RepeatedComposite, targets: List[EntityAnnotation], search_term: str, orientation: str ="vertical") -> List[str]:
 
-    def _extract_total(row: List[str]) -> int:
-        for element in row:
-            try:
-                return int(element.replace(" ", "").replace(",", ""))
-            except ValueError:
-                continue
-
-    def _get_total_row(text: RepeatedComposite, coords: Dict[str, int], orientation: str) -> List[str]:
-    
         adjustment = 0.98
         result_length_limit = 5
-        
+
+        if not targets:
+            print("No targets")
+            return []
+
+        coords = {}
+
+        for target in targets:
+            coords = {
+                "y": target.bounding_poly.vertices[0].y,
+                "x": target.bounding_poly.vertices[0].x
+            }
         match orientation:
             case "vertical":
                 height = coords["y"]
@@ -67,35 +69,35 @@ def get_total(text: RepeatedComposite):
             if (
                 line_height > adjusted_down
                 and line_height < adjusted_up
-                and "合" not in description
+                and search_term not in description
                 ):
                 results.append(description)
         if len(results) >= result_length_limit and orientation == "vertical":
-            return _get_total_row(text, coords, "horizontal")
+            return get_value(text, targets, search_term, orientation="horizontal")
+
         return results
+
+def search(text: RepeatedComposite, search_term):
+
+    def _extract_value(row: List[str]) -> int:
+        for element in row:
+            try:
+                return int(element.replace(" ", "").replace(",", ""))
+            except ValueError:
+                continue
 
     targets: List[EntityAnnotation] = []
 
     for line in text[1:]:
-        if "合" in line.description:
+        if search_term in line.description:
             targets.append(line)
-
+ 
     if not targets:
-        print("No 合計 found:")
+        print(f"{search_term} not found.")
         print({"DEBUG" : text[0].description})
-        sys.exit()
 
-    coords = {}
-
-    for target in targets:
-        print({"target":target.description})
-        coords = {
-            "y": target.bounding_poly.vertices[0].y,
-            "x": target.bounding_poly.vertices[0].x
-        }
-
-    row = _get_total_row(text, coords, "vertical")
-    total = _extract_total(row)
+    row = get_value(text, targets, search_term)
+    total = _extract_value(row)
     return total
 
 def get_info(text: RepeatedComposite) -> Dict[str, any]:
@@ -104,7 +106,6 @@ def get_info(text: RepeatedComposite) -> Dict[str, any]:
     word_list = text[0].description.split("\n")
 
     for char in word_list:
-        print(char)
         if "泰和" in char:
             info["name"] = "Chinese Super"
             info["type"] = "groceries"
@@ -123,15 +124,17 @@ def get_info(text: RepeatedComposite) -> Dict[str, any]:
         if "上記正に領収いたしました" in char:
             info["name"] = "Lawson"
             info["type"] = "groceries"
-        if "黒ラベル" or "クロラベル" in char:
+        if "黒ラベル" in char or "クロラベル" in char:
             info["alcohol"] = True
-
-    info["total"] = get_total(text)
+        if "ドミノピザ" in char:
+            info["name"] = "Domino's"
+            info["type"] = "dining"
+    info["total"] = search(text, "合")
 
     return info
 
 def main():
-    text: RepeatedComposite = get_text("test_receipt_mybasket.jpg")
+    text: RepeatedComposite = get_text("test_receipt_dominos.jpg")
     info = get_info(text)
     print(info)
 
