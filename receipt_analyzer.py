@@ -2,12 +2,22 @@ import io
 import os
 import datetime
 import re
+import time
 
 from typing import List, Dict
-# Imports the Google Cloud client library
 from google.cloud import vision
 from google.cloud.vision_v1.types.image_annotator import EntityAnnotation
 from proto.marshal.collections import RepeatedComposite
+
+
+class Tags:
+    GROCERIES = "groceries"
+    DINING = "dining"
+    BENTO = "bento"
+    HOUSEHOLD = "household"
+    ALCOHOL = "alcohol"
+    CLOTHES = "clothes"
+
 
 def get_text(path: str):
     """
@@ -104,6 +114,7 @@ def search(text: RepeatedComposite, search_term):
                 return int(element.replace(" ", "").replace(",", ""))
             except ValueError:
                 continue
+        return 0
 
     targets: List[EntityAnnotation] = []
 
@@ -121,7 +132,7 @@ def search(text: RepeatedComposite, search_term):
 
 def get_info(text: RepeatedComposite) -> Dict[str, any]:
     """
-    Returns a dictionary of name, date, type,
+    Returns a dictionary of name, date, tags,
     and total price of a given receipt.
     """
 
@@ -131,66 +142,88 @@ def get_info(text: RepeatedComposite) -> Dict[str, any]:
         """
         date_regex = r"[0-9]{2,4}[/年][0-9]{1,2}[/月][0-9]{1,2}"
         if match := re.match(date_regex, line):
-            matched_date = match.group()
-            if "年" in matched_date or "月" in matched_date:
+            date_str = match.group()
+            if "年" in date_str or "月" in date_str:
                 try:
-                    date = datetime.datetime.strptime(matched_date, "%Y年%m月%d")
+                    date = datetime.datetime.strptime(date_str, "%Y年%m月%d")
                 except ValueError:
-                    date = datetime.datetime.strptime(matched_date, "%y年%m月%d")
+                    date = datetime.datetime.strptime(date_str, "%y年%m月%d")
             else:
                 try: 
-                    date = datetime.datetime.strptime(matched_date, "%Y/%m/%d")
+                    date = datetime.datetime.strptime(date_str, "%Y/%m/%d")
                 except ValueError:
-                    date = datetime.datetime.strptime(matched_date, "%y/%m/%d")
+                    date = datetime.datetime.strptime(date_str, "%y/%m/%d")
 
             return f"{date.year}-{date.month}-{date.day}"
         else:
             return ""
 
-    info: Dict[str, any] = {}
+    DATE = "date"
+    NAME = "name"
+    TOTAL = "total"
+    TAGS = "tags"
+
+    info: Dict[str, str | int | List[str]] = {}
+    info[TAGS] = []
+
     word_list = text[0].description.split("\n")
 
     for line in word_list:
-
         print(line)
-
-        if date := get_date(line):
-            info["date"] = date
-
+        if new_date := get_date(line):
+            info[DATE] = new_date
         if "泰和" in line:
-            info["name"] = "Chinese Super"
-            info["type"] = "groceries"
+            info[NAME] = "Chinese Super"
+            info[TAGS].append(Tags.GROCERIES)
         if "肉のハナマ" in line:
-            info["name"] = "Niku no Hanamasa"
-            info["type"] = "groceries"
+            info[NAME] = "Niku no Hanamasa"
+            info[TAGS].append(Tags.GROCERIES)
         if "東武ストア" in line:
-            info["name"] = "Kasai New Super"
-            info["type"] = "groceries"
+            info[NAME] = "Kasai New Super"
+            info[TAGS].append(Tags.GROCERIES)
         if "smartwaon" in line:
-            info["name"] = "My Basket"
-            info["type"] = "groceries"
+            info[NAME] = "My Basket"
+            info[TAGS].append(Tags.GROCERIES)
         if "セブン-イレブン" in line:
-            info["name"] = "Seven Eleven"
-            info["type"] = "groceries"
+            info[NAME] = "Seven Eleven"
+            info[TAGS].append(Tags.GROCERIES)
         if "上記正に領収いたしました" in line:
-            info["name"] = "Lawson"
-            info["type"] = "groceries"
+            info[NAME] = "Lawson"
+            info[TAGS].append(Tags.GROCERIES)
         if "黒ラベル" in line or "クロラベル" in line:
-            info["alcohol"] = True
+            info[TAGS].append(Tags.ALCOHOL)
         if "ドミノピザ" in line:
-            info["name"] = "Domino's"
-            info["type"] = "dining"
+            info[NAME] = "Domino's"
+            info[TAGS].append(Tags.DINING)
         if "Hotto" in line:
-            info["name"] = "Hotto Motto"
-            info["type"] = "bento"
+            info[NAME] = "Hotto Motto"
+            info[TAGS].append(Tags.bento)
+        if "welcia" in line:
+            info[NAME] = "Welcia"
+            info[TAGS].append(Tags.GROCERIES)
+        if "貴族" in line:
+            info[NAME] = "Torikizoku"
+            info[TAGS].append(Tags.DINING)
+        if "ロフト" in line:
+            info[NAME] = "Loft"
+            info[TAGS].append(Tags.HOUSEHOLD)
+        if "UNIQLO" in line:
+            info[NAME] = "Uniqlo"
+            info[TAGS].append(Tags.CLOTHES)
+        if "ヨーカドー" in line:
+            info[NAME] = "Ito Yokado"
+            info[TAGS].append(Tags.GROCERIES)
 
-    info["total"] = search(text, "合")
+    info[TOTAL] = search(text, "合")
 
     return info
 
 def main() -> None:
+    start = time.time()
     text: RepeatedComposite = get_text("test_receipt_seveneleven.jpg")
+    end = time.time()
     info = get_info(text)
+    print(f"Time elapsed getting text from API: {round(end - start, 2)} seconds.")
     print(info)
 
 
