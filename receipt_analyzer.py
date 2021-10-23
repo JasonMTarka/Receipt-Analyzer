@@ -8,7 +8,7 @@ from google.cloud import vision
 from google.cloud.vision_v1.types.image_annotator import EntityAnnotation
 from proto.marshal.collections import RepeatedComposite
 
-from constants import Orientations, Tags
+from constants import Categories, Orientations, ITEMS
 
 
 def get_text(path: str):
@@ -92,7 +92,7 @@ def get_row(
 
         return results
 
-def search(text: RepeatedComposite, search_term):
+def search(text: RepeatedComposite, search_term: str):
     """
     Search a receipt for a given search term and attempt to get corresponding 
     price.
@@ -151,63 +151,21 @@ def get_info(text: RepeatedComposite) -> Dict[str, any]:
         else:
             return ""
 
-    DATE = "date"
-    NAME = "name"
-    TOTAL = "total"
-    TAGS = "tags"
-
     info: Dict[str, str | int | List[str]] = {}
-    info[TAGS] = []
+    info[Categories.TAGS] = []
 
     word_list = text[0].description.split("\n")
 
     for line in word_list:
         print(line)
-        if new_date := get_date(line):
-            info[DATE] = new_date
-        if "泰和" in line:
-            info[NAME] = "Chinese Super"
-            info[TAGS].append(Tags.GROCERIES)
-        if "肉のハナマ" in line:
-            info[NAME] = "Niku no Hanamasa"
-            info[TAGS].append(Tags.GROCERIES)
-        if "東武ストア" in line:
-            info[NAME] = "Kasai New Super"
-            info[TAGS].append(Tags.GROCERIES)
-        if "smartwaon" in line:
-            info[NAME] = "My Basket"
-            info[TAGS].append(Tags.GROCERIES)
-        if "セブン-イレブン" in line:
-            info[NAME] = "Seven Eleven"
-            info[TAGS].append(Tags.GROCERIES)
-        if "上記正に領収いたしました" in line:
-            info[NAME] = "Lawson"
-            info[TAGS].append(Tags.GROCERIES)
-        if "黒ラベル" in line or "クロラベル" in line:
-            info[TAGS].append(Tags.ALCOHOL)
-        if "ドミノピザ" in line:
-            info[NAME] = "Domino's"
-            info[TAGS].append(Tags.DINING)
-        if "Hotto" in line:
-            info[NAME] = "Hotto Motto"
-            info[TAGS].append(Tags.BENTO)
-        if "welcia" in line:
-            info[NAME] = "Welcia"
-            info[TAGS].append(Tags.GROCERIES)
-        if "貴族" in line:
-            info[NAME] = "Torikizoku"
-            info[TAGS].append(Tags.DINING)
-        if "ロフト" in line:
-            info[NAME] = "Loft"
-            info[TAGS].append(Tags.HOUSEHOLD)
-        if "UNIQLO" in line:
-            info[NAME] = "Uniqlo"
-            info[TAGS].append(Tags.CLOTHES)
-        if "ヨーカドー" in line:
-            info[NAME] = "Ito Yokado"
-            info[TAGS].append(Tags.GROCERIES)
+        for item in ITEMS.keys():
+            if new_date := get_date(line):
+                info[Categories.DATE] = new_date
+            if item in line:
+                info[Categories.NAME] = ITEMS[item][Categories.NAME]
+                info[Categories.TAGS].append(ITEMS[item][Categories.TAGS])
 
-    info[TOTAL] = search(text, "合")
+    info[Categories.TOTAL] = search(text, "合")
 
     return info
 
