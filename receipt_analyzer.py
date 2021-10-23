@@ -3,20 +3,12 @@ import os
 import datetime
 import re
 import time
-
 from typing import List, Dict
 from google.cloud import vision
 from google.cloud.vision_v1.types.image_annotator import EntityAnnotation
 from proto.marshal.collections import RepeatedComposite
 
-
-class Tags:
-    GROCERIES = "groceries"
-    DINING = "dining"
-    BENTO = "bento"
-    HOUSEHOLD = "household"
-    ALCOHOL = "alcohol"
-    CLOTHES = "clothes"
+from constants import Orientations, Tags
 
 
 def get_text(path: str):
@@ -53,13 +45,13 @@ def get_row(
     text: RepeatedComposite,
     targets: List[EntityAnnotation],
     search_term: str,
-    orientation: str ="vertical"
+    orientation: str = Orientations.VERTICAL
     ) -> List[str]:
         """
         Get row containing search term and corresponding price.
         """
-        adjustment = 0.98
-        result_length_limit = 5
+        ADJUSTMENT = 0.98
+        RESULT_LENGTH_LIMIT = 5
 
         if not targets:
             print("No targets")
@@ -73,20 +65,20 @@ def get_row(
                 "x": target.bounding_poly.vertices[0].x
             }
         match orientation:
-            case "vertical":
+            case Orientations.VERTICAL:
                 height = coords["y"]
-            case "horizontal":
+            case Orientations.HORIZONTAL:
                 height = coords["x"]
 
-        adjusted_up = height / adjustment
-        adjusted_down = height * adjustment
+        adjusted_up = height / ADJUSTMENT
+        adjusted_down = height * ADJUSTMENT
 
         results = []
         for line in text[1:]:
             description = line.description
             line_height = line.bounding_poly.vertices[0].y
 
-            if orientation == "horizontal":
+            if orientation == Orientations.HORIZONTAL:
                 line_height = line.bounding_poly.vertices[0].x
             if (
                 line_height > adjusted_down
@@ -94,8 +86,9 @@ def get_row(
                 and search_term not in description
                 ):
                 results.append(description)
-        if len(results) >= result_length_limit and orientation == "vertical":
-            return get_row(text, targets, search_term, orientation="horizontal")
+
+        if len(results) >= RESULT_LENGTH_LIMIT and orientation == Orientations.VERTICAL:
+            return get_row(text, targets, search_term, orientation=Orientations.HORIZONTAL)
 
         return results
 
@@ -197,7 +190,7 @@ def get_info(text: RepeatedComposite) -> Dict[str, any]:
             info[TAGS].append(Tags.DINING)
         if "Hotto" in line:
             info[NAME] = "Hotto Motto"
-            info[TAGS].append(Tags.bento)
+            info[TAGS].append(Tags.BENTO)
         if "welcia" in line:
             info[NAME] = "Welcia"
             info[TAGS].append(Tags.GROCERIES)
