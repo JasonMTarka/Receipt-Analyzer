@@ -55,10 +55,10 @@ def main() -> None:
     image = "test_receipt_lawson.jpg"
     start = time.time()
     text: RepeatedComposite = get_text(image)
-    end = time.time()
+    total_time = time.time() - start
     info = retrieve_info(text)
     print(
-        f"Time elapsed getting text from API: {round(end - start, 2)} seconds."
+        f"Time elapsed getting text from API: {round(total_time, 2)} seconds."
     )
     print(info)
 
